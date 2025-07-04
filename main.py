@@ -142,6 +142,7 @@ class Win11TitleBar(QWidget):
                 background-color: rgba(255, 255, 255, 0.7);  /* 半透明白色背景 */
                 backdrop-filter: blur(8px);  /* 毛玻璃效果 */
                 border-bottom: 1px solid rgba(220, 220, 220, 0.8);
+                border-radius: 8px 8px 0 0;  /* 添加顶部圆角 */
             }
         """
         )
@@ -267,29 +268,6 @@ class Win11TitleBar(QWidget):
             self.is_maximized = True
             self.max_btn.setText("\u2398")  # 切换为还原图标
 
-        # 更新标题栏样式（最大化时调整边框）
-        if self.is_maximized:
-            self.setStyleSheet(
-                """
-                Win11TitleBar {
-                    background-color: rgba(255, 255, 255, 0.7);
-                    backdrop-filter: blur(8px);
-                    border-bottom: 1px solid rgba(220, 220, 220, 0.8);
-                    border-radius: 0px 0px 8px 8px;  /* 最大化时底部圆角 */
-                }
-            """
-            )
-        else:
-            self.setStyleSheet(
-                """
-                Win11TitleBar {
-                    background-color: rgba(255, 255, 255, 0.7);
-                    backdrop-filter: blur(8px);
-                    border-bottom: 1px solid rgba(220, 220, 220, 0.8);
-                }
-            """
-            )
-
     def mousePressEvent(self, event):
         """支持拖动窗口（标题栏区域）"""
         if event.button() == Qt.LeftButton:
@@ -307,11 +285,10 @@ class Win11TitleBar(QWidget):
         super().enterEvent(event)
 
     def leaveEvent(self, event):
-        """鼠标离开标题栏且不在窗口顶部时隐藏按钮"""
-        if not self.parent.is_fullscreen and self.parent.last_mouse_position.y() > 20:
-            if not self.animating:
-                self.animating = True
-                self.hide_buttons_animation()
+        """鼠标离开标题栏时隐藏按钮"""
+        if not self.animating:
+            self.animating = True
+            self.hide_buttons_animation()
         super().leaveEvent(event)
 
     def show_buttons_animation(self):
@@ -364,13 +341,13 @@ class MinimalBrowser(QWidget):
         self.title_bar_timer = QTimer(self)
         self.title_bar_timer.setSingleShot(True)  # 只触发一次
         self.title_bar_timer.timeout.connect(self.show_title_bar_after_delay)
-        self.hover_delay = 300  # 悬停延迟时间（毫秒），可调整
+        self.hover_delay = 1000  # 悬停延迟时间1000毫秒（1秒）
 
         # 记录鼠标是否在顶部区域
         self.mouse_in_top_area = False
 
         # 设置窗口无边框和透明背景
-        self.setWindowFlags(Qt.FramelessWindowHint)
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.Window)
         self.setAttribute(Qt.WA_TranslucentBackground)
 
         # 设置窗口大小
@@ -450,11 +427,6 @@ class MinimalBrowser(QWidget):
         self.title_bar.raise_()  # 确保标题栏在最上层
         self.title_bar.hide()  # 初始隐藏
 
-        # 修复：为标题栏添加固定的透明度效果
-        self.title_bar_effect = QGraphicsOpacityEffect(self.title_bar)
-        self.title_bar_effect.setOpacity(0.0)  # 初始完全透明
-        self.title_bar.setGraphicsEffect(self.title_bar_effect)
-
         # 配置浏览器设置
         self.configure_browser()
 
@@ -480,8 +452,8 @@ class MinimalBrowser(QWidget):
         self.animation.setDuration(200)
         self.animation.setEasingCurve(QEasingCurve.OutQuad)
 
-        # 创建大小拖拽手柄
-        self.size_grips = [QSizeGrip(self) for _ in range(4)]
+        # 创建右下角大小拖拽手柄
+        self.size_grip = QSizeGrip(self)  # 只创建一个右下角的缩放手柄
 
         # 确保标题栏初始位置正确
         QTimer.singleShot(100, self.position_title_bar)
@@ -589,7 +561,7 @@ class MinimalBrowser(QWidget):
         self.page.runJavaScript(hide_scrollbar_js)
 
         # 注册用于全屏通信的通道
-        # self.page.registerChannel("fullscreen", self)
+        self.page.fullScreenRequested.connect(self.handle_fullscreen_request)
 
     def update_window_title(self, title):
         self.title_bar.title.setText(title)
@@ -616,60 +588,6 @@ class MinimalBrowser(QWidget):
                 if (document.querySelector('html')) {
                     document.querySelector('html').lang = 'zh-CN';
                 }
-                
-                // 隐藏滚动条但保留滚动功能
-                document.documentElement.style.scrollbarWidth = 'thin';
-                document.documentElement.style.msOverflowStyle = 'none';
-                
-                // 防止在新窗口打开链接
-                document.addEventListener('click', function(event) {
-                    var target = event.target;
-                    while (target && target.tagName !== 'A') {
-                        target = target.parentNode;
-                    }
-                    if (target && target.tagName === 'A' && target.target === '_blank') {
-                        target.target = '_self';
-                        event.preventDefault();
-                        window.location.href = target.href;
-                    }
-                });
-                
-                // 添加样式隐藏滚动条
-                var style = document.createElement('style');
-                style.innerHTML = `
-                    ::-webkit-scrollbar {
-                        width: 6px;
-                        height: 6px;
-                    }
-                    ::-webkit-scrollbar-track {
-                        background: transparent;
-                    }
-                    ::-webkit-scrollbar-thumb {
-                        background: rgba(150, 150, 150, 0.5);
-                        border-radius: 3px;
-                    }
-                    ::-webkit-scrollbar-thumb:hover {
-                        background: rgba(100, 100, 100, 0.7);
-                    }
-                `;
-                document.head.appendChild(style);
-                
-                // 监听全屏请求
-                document.addEventListener('fullscreenchange', function(event) {
-                    if (document.fullscreenElement) {
-                        window.external.notify('enterFullscreen');
-                    } else {
-                        window.external.notify('exitFullscreen');
-                    }
-                });
-                
-                document.addEventListener('webkitfullscreenchange', function(event) {
-                    if (document.webkitFullscreenElement) {
-                        window.external.notify('enterFullscreen');
-                    } else {
-                        window.external.notify('exitFullscreen');
-                    }
-                });
             """
             )
         else:
@@ -730,9 +648,6 @@ class MinimalBrowser(QWidget):
             """
             )
 
-        # 连接全屏请求信号
-        self.page.fullScreenRequested.connect(self.handle_fullscreen_request)
-
     def handle_fullscreen_request(self, request):
         """处理HTML5全屏API请求"""
         if request.toggleOn():
@@ -747,9 +662,8 @@ class MinimalBrowser(QWidget):
         """进入全屏模式"""
         if not self.is_fullscreen:
             self.is_fullscreen = True
-            # 全屏时直接隐藏标题栏，并重置透明度（避免动画干扰）
+            # 全屏时隐藏标题栏
             self.title_bar.hide()
-            self.title_bar_effect.setOpacity(0.0)
             self.title_bar_visible = False
             self.showFullScreen()
             # 通知页面已进入全屏
@@ -767,11 +681,9 @@ class MinimalBrowser(QWidget):
         """退出全屏模式"""
         if self.is_fullscreen:
             self.is_fullscreen = False
-            # 退出全屏时，显示标题栏（但不立即显示，由鼠标位置决定）
-            # 重置透明度为0，然后根据鼠标位置决定是否显示
-            self.title_bar_effect.setOpacity(0.0)
-            self.title_bar.hide()
-            self.title_bar_visible = False
+            # 退出全屏时，显示标题栏
+            self.title_bar.show()
+            self.title_bar_visible = True
             self.showNormal()
             # 通知页面已退出全屏
             self.page.runJavaScript(
@@ -781,11 +693,9 @@ class MinimalBrowser(QWidget):
                 }
             """
             )
-            # 退出全屏后，检查鼠标位置
-            self.check_mouse_position()
 
     def check_mouse_position(self):
-        """检查鼠标位置，决定是否延迟显示标题栏"""
+        """检查鼠标位置，决定是否显示标题栏"""
         if self.is_fullscreen:
             return
 
@@ -794,64 +704,40 @@ class MinimalBrowser(QWidget):
         self.last_mouse_position = current_pos
 
         # 检查鼠标是否在顶部区域（20像素内）
-        if self.mouse_in_top_area == False:
-            in_top_area = window_pos.y() < 20
-        else:
-            in_top_area = window_pos.y() < 40
+        in_top_area = window_pos.y() < 20
 
-        if in_top_area and not self.mouse_in_top_area:
-            # 鼠标刚进入顶部区域，启动计时器
-            self.mouse_in_top_area = True
-            self.title_bar_timer.start(self.hover_delay)  # 延迟指定毫秒后显示
-        elif not in_top_area and self.mouse_in_top_area:
-            # 鼠标离开顶部区域，停止计时器并隐藏标题栏
-            self.mouse_in_top_area = False
-            self.title_bar_timer.stop()
-            self.hide_title_bar_with_animation()
+        if in_top_area and not self.title_bar_visible:
+            # 鼠标进入顶部区域，启动延迟显示定时器
+            if not self.title_bar_timer.isActive():
+                self.title_bar_timer.start(self.hover_delay)
+        elif not in_top_area and self.title_bar_visible:
+            # 鼠标离开顶部区域，立即隐藏标题栏
+            self.title_bar.hide()
+            self.title_bar_visible = False
+            # 如果定时器在运行，停止定时器
+            if self.title_bar_timer.isActive():
+                self.title_bar_timer.stop()
 
     def show_title_bar_after_delay(self):
-        """延迟后显示标题栏"""
-        if self.mouse_in_top_area:  # 确保鼠标仍在顶部区域
-            self.show_title_bar_with_animation()
+        """延迟显示标题栏（2秒后）"""
+        current_pos = QCursor.pos()
+        window_pos = self.mapFromGlobal(current_pos)
 
-    def show_title_bar_with_animation(self):
-        """动画显示标题栏"""
-        if not self.title_bar_visible:
-            self.title_bar_visible = True
-            # 定位标题栏到顶部
-            self.position_title_bar()
+        # 再次检查鼠标是否仍在顶部区域
+        if window_pos.y() < 20 and not self.title_bar_visible:
             self.title_bar.show()
-
-            # 创建淡入动画 - 使用固定的效果对象
-            anim = QPropertyAnimation(self.title_bar_effect, b"opacity")
-            anim.setDuration(300)
-            anim.setStartValue(0.0)
-            anim.setEndValue(1.0)
-            anim.start()
-
-    def hide_title_bar_with_animation(self):
-        """动画隐藏标题栏"""
-        if self.title_bar_visible:
-            self.title_bar_visible = False
-
-            # 创建淡出动画 - 使用固定的效果对象
-            anim = QPropertyAnimation(self.title_bar_effect, b"opacity")
-            anim.setDuration(300)
-            anim.setStartValue(1.0)
-            anim.setEndValue(0.0)
-            anim.finished.connect(self.title_bar.hide)
-            anim.start()
+            self.title_bar_visible = True
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
         # 更新标题栏位置和大小
         self.position_title_bar()
 
-        # 定位大小拖拽手柄
+        # 定位右下角大小拖拽手柄
         size = 16
-        self.size_grips[3].setGeometry(
+        self.size_grip.setGeometry(
             self.width() - size, self.height() - size, size, size
-        )  # 右下
+        )
 
     def go_back(self):
         """导航回上一页"""
