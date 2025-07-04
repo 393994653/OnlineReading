@@ -27,7 +27,7 @@ from PyQt5.QtWidgets import (
     QStyleOption,
     QStylePainter,
     QProgressBar,
-    QGraphicsOpacityEffect,  # 添加透明度效果
+    QGraphicsOpacityEffect,
 )
 from PyQt5.QtWebEngineWidgets import (
     QWebEngineView,
@@ -315,14 +315,15 @@ class Win11TitleBar(QWidget):
         super().leaveEvent(event)
 
     def show_buttons_animation(self):
-        """按钮显示动画"""
+        """按钮显示动画 - 所有按钮同时出现"""
+        # 创建一个并行动画组用于同时显示所有按钮
         group = QSequentialAnimationGroup(self)
 
-        for i, button in enumerate(self.animated_buttons):
+        for button in self.animated_buttons:
             button.show()
             effect = button.graphicsEffect()
             anim = QPropertyAnimation(effect, b"opacity")
-            anim.setDuration(100)
+            anim.setDuration(200)  # 稍微延长动画时间
             anim.setStartValue(0.0)
             anim.setEndValue(1.0)
             anim.setEasingCurve(QEasingCurve.OutQuad)
@@ -332,16 +333,16 @@ class Win11TitleBar(QWidget):
         group.start()
 
     def hide_buttons_animation(self):
-        """按钮隐藏动画"""
+        """按钮隐藏动画 - 所有按钮同时消失"""
+        # 创建一个并行动画组用于同时隐藏所有按钮
         group = QSequentialAnimationGroup(self)
 
-        for i, button in enumerate(reversed(self.animated_buttons)):
+        for button in self.animated_buttons:
             effect = button.graphicsEffect()
             anim = QPropertyAnimation(effect, b"opacity")
-            anim.setDuration(100)
+            anim.setDuration(200)  # 稍微延长动画时间
             anim.setStartValue(1.0)
             anim.setEndValue(0.0)
-            anim.setEasingCurve(QEasingCurve.OutQuad)
             anim.finished.connect(
                 lambda btn=button: btn.hide() if anim.endValue() == 0.0 else None
             )
@@ -400,10 +401,6 @@ class MinimalBrowser(QWidget):
         self.content_layout.setContentsMargins(0, 0, 0, 0)
         self.content_layout.setSpacing(0)
 
-        # 创建标题栏
-        self.title_bar = Win11TitleBar(self)
-        self.content_layout.addWidget(self.title_bar)
-
         # 创建进度条
         self.progress_bar = QProgressBar()
         self.progress_bar.setFixedHeight(3)
@@ -447,6 +444,17 @@ class MinimalBrowser(QWidget):
         self.browser.setPage(self.page)
         self.content_layout.addWidget(self.browser)
 
+        # 创建标题栏 - 作为浮动组件而不是布局的一部分
+        self.title_bar = Win11TitleBar(self)
+        self.title_bar.setParent(self.content_frame)  # 设置父对象为内容框架
+        self.title_bar.raise_()  # 确保标题栏在最上层
+        self.title_bar.hide()  # 初始隐藏
+
+        # 修复：为标题栏添加固定的透明度效果
+        self.title_bar_effect = QGraphicsOpacityEffect(self.title_bar)
+        self.title_bar_effect.setOpacity(0.0)  # 初始完全透明
+        self.title_bar.setGraphicsEffect(self.title_bar_effect)
+
         # 配置浏览器设置
         self.configure_browser()
 
@@ -475,11 +483,16 @@ class MinimalBrowser(QWidget):
         # 创建大小拖拽手柄
         self.size_grips = [QSizeGrip(self) for _ in range(4)]
 
-        # 标题栏动画
-        self.title_bar_animation = QPropertyAnimation(self.title_bar, b"windowOpacity")
-        self.title_bar_animation.setDuration(300)
-        self.title_bar_animation.setStartValue(0.0)
-        self.title_bar_animation.setEndValue(1.0)
+        # 确保标题栏初始位置正确
+        QTimer.singleShot(100, self.position_title_bar)
+
+    def position_title_bar(self):
+        """定位标题栏到内容框架顶部"""
+        if self.content_frame:
+            # 标题栏的父对象是content_frame，所以设置位置为(0,0)即可
+            self.title_bar.setGeometry(
+                0, 0, self.content_frame.width(), self.title_bar.height()
+            )
 
     def configure_browser(self):
         """配置浏览器设置"""
@@ -734,7 +747,10 @@ class MinimalBrowser(QWidget):
         """进入全屏模式"""
         if not self.is_fullscreen:
             self.is_fullscreen = True
+            # 全屏时直接隐藏标题栏，并重置透明度（避免动画干扰）
             self.title_bar.hide()
+            self.title_bar_effect.setOpacity(0.0)
+            self.title_bar_visible = False
             self.showFullScreen()
             # 通知页面已进入全屏
             self.page.runJavaScript(
@@ -751,7 +767,11 @@ class MinimalBrowser(QWidget):
         """退出全屏模式"""
         if self.is_fullscreen:
             self.is_fullscreen = False
-            self.title_bar.show()
+            # 退出全屏时，显示标题栏（但不立即显示，由鼠标位置决定）
+            # 重置透明度为0，然后根据鼠标位置决定是否显示
+            self.title_bar_effect.setOpacity(0.0)
+            self.title_bar.hide()
+            self.title_bar_visible = False
             self.showNormal()
             # 通知页面已退出全屏
             self.page.runJavaScript(
@@ -761,6 +781,8 @@ class MinimalBrowser(QWidget):
                 }
             """
             )
+            # 退出全屏后，检查鼠标位置
+            self.check_mouse_position()
 
     def check_mouse_position(self):
         """检查鼠标位置，决定是否延迟显示标题栏"""
@@ -796,29 +818,37 @@ class MinimalBrowser(QWidget):
         """动画显示标题栏"""
         if not self.title_bar_visible:
             self.title_bar_visible = True
-            self.title_bar_animation.setDirection(QPropertyAnimation.Forward)
-            self.title_bar_animation.start()
+            # 定位标题栏到顶部
+            self.position_title_bar()
             self.title_bar.show()
+
+            # 创建淡入动画 - 使用固定的效果对象
+            anim = QPropertyAnimation(self.title_bar_effect, b"opacity")
+            anim.setDuration(300)
+            anim.setStartValue(0.0)
+            anim.setEndValue(1.0)
+            anim.start()
 
     def hide_title_bar_with_animation(self):
         """动画隐藏标题栏"""
         if self.title_bar_visible:
             self.title_bar_visible = False
-            self.title_bar_animation.setDirection(QPropertyAnimation.Backward)
-            self.title_bar_animation.start()
-            # 动画结束后隐藏
-            QTimer.singleShot(self.title_bar_animation.duration(), self.title_bar.hide)
+
+            # 创建淡出动画 - 使用固定的效果对象
+            anim = QPropertyAnimation(self.title_bar_effect, b"opacity")
+            anim.setDuration(300)
+            anim.setStartValue(1.0)
+            anim.setEndValue(0.0)
+            anim.finished.connect(self.title_bar.hide)
+            anim.start()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        # 更新标题栏大小
-        self.title_bar.resize(self.width(), 40)
+        # 更新标题栏位置和大小
+        self.position_title_bar()
 
         # 定位大小拖拽手柄
         size = 16
-        # self.size_grips[0].setGeometry(0, 0, size, size)  # 左上
-        # self.size_grips[1].setGeometry(self.width() - size, 0, size, size)  # 右上
-        # self.size_grips[2].setGeometry(0, self.height() - size, size, size)  # 左下
         self.size_grips[3].setGeometry(
             self.width() - size, self.height() - size, size, size
         )  # 右下
