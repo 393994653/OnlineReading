@@ -1,0 +1,6 @@
+/my_browser_profile
+/browser_profile
+/.venv
+
+*.log
+*.spec
