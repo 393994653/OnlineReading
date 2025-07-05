@@ -1,6 +1,8 @@
 /my_browser_profile
 /browser_profile
 /.venv
+/dist
+/build
 
 *.log
 *.spec
