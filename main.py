@@ -453,6 +453,7 @@ class MinimalBrowser(QWidget):
         else:
             # 加载完成后延迟隐藏进度条
             QTimer.singleShot(500, self.progress_bar.hide)
+        self.progress_bar.hide()
 
     def on_load_finished(self, success):
         self.unlock_refresh()
