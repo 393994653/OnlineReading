@@ -5,6 +5,5 @@
 /build
 
 *.log
-*.spec
 run.bat
 

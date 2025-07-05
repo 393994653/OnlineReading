@@ -1,65 +1,89 @@
-import PyInstaller.__main__
+# build.py - PyInstaller 打包脚本
 import os
-import shutil
 import sys
-from PyQt5.QtCore import QLibraryInfo
+import PyInstaller.__main__
 
-# 清理之前的构建
-if os.path.exists("dist"):
-    shutil.rmtree("dist")
-if os.path.exists("build"):
-    shutil.rmtree("build")
+# 主程序文件名
+main_script = 'main.py'
 
-# 获取Qt安装路径
-qt_path = QLibraryInfo.location(QLibraryInfo.PrefixPath)
+# 图标文件（确保此文件存在）
+icon_file = 'icon.ico'
 
-# 定义打包参数
-params = [
-    "main.py",  # 替换为你的脚本文件名
-    "--name=OnlineReading",
-    "--onefile",
-    "--windowed",
-    "--icon=icon.ico",
-    "--splash=loading.png",
-    "--clean",
-    "--noconfirm",
-    "--add-binary=" + os.path.join(qt_path, "bin", "Qt5WebEngineCore.dll;PyQt5/Qt/bin"),
-    "--add-binary="
-    + os.path.join(qt_path, "bin", "Qt5WebEngineWidgets.dll;PyQt5/Qt/bin"),
-    "--add-binary=" + os.path.join(qt_path, "bin", "Qt5WebEngine.dll;PyQt5/Qt/bin"),
-    "--add-binary="
-    + os.path.join(qt_path, "bin", "QtWebEngineProcess.exe;PyQt5/Qt/bin"),
-    "--add-data=" + os.path.join(qt_path, "resources") + ";PyQt5/Qt/resources",
-    "--add-data="
-    + os.path.join(qt_path, "translations", "qtwebengine_locales")
-    + ";PyQt5/Qt/translations/qtwebengine_locales",
-    "--hidden-import=PyQt5.QtWebEngineWidgets",
-    "--hidden-import=PyQt5.QtWebEngineCore",
-    "--hidden-import=PyQt5.QtWebEngineProcess",
+# 打包输出目录
+build_dir = 'dist'
+
+# 隐藏控制台窗口（启用 Windows 子系统）
+console_option = '--noconsole'
+
+# 打包选项列表
+options = [
+    main_script,                # 主脚本文件
+    '--name', 'OnlineReading',  # 可执行文件名称
+    '--icon', icon_file,        # 应用图标
+    '--distpath', build_dir,    # 输出目录
+    '--workpath', 'build',      # 临时构建目录
+    '--specpath', 'spec',       # spec 文件目录
+    console_option,             # 控制台选项
+    '--onefile',                # 打包为单个可执行文件
+    '--windowed',               # 窗口应用（无控制台）
+    
+    # 包含 Qt WebEngine 核心文件
+    '--collect-data', 'PyQt5.QtWebEngineCore',
+    
+    # 包含 Qt WebEngine 资源文件
+    '--collect-data', 'PyQt5.QtWebEngineWidgets',
+    
+    # 包含 Qt WebEngine 翻译文件
+    '--collect-data', 'PyQt5.QtWebEngineProcess',
+    
+    # 包含 Qt WebEngine 核心资源
+    '--collect-data', 'PyQt5.QtWebEngineCore.qtwebengine_resources',
+    
+    # 包含 Qt WebEngine 核心翻译
+    '--collect-data', 'PyQt5.QtWebEngineCore.qtwebengine_locales',
+    
+    # 包含 Qt WebEngine 进程
+    '--collect-binaries', 'PyQt5.QtWebEngineProcess',
+    
+    # 清理构建目录
+    '--clean',
+    
+    # 隐藏 PyInstaller 输出
+    '--noconfirm'
 ]
 
-# 添加所有必要的资源文件
-webengine_resources = [
-    "qtwebengine_resources.pak",
-    "qtwebengine_devtools_resources.pak",
-    "qtwebengine_resources_100p.pak",
-    "qtwebengine_resources_200p.pak",
-    "icudtl.dat",
-]
+def main():
+    # 检查图标文件是否存在
+    if not os.path.exists(icon_file):
+        print(f"错误: 图标文件 '{icon_file}' 不存在")
+        print("请创建一个 128x128 像素的 .ico 文件并命名为 'icon.ico'")
+        print("您可以使用在线工具将 PNG 转换为 ICO 格式")
+        return
+    
+    # 检查主脚本文件是否存在
+    if not os.path.exists(main_script):
+        print(f"错误: 主脚本文件 '{main_script}' 不存在")
+        print("请确保您的浏览器程序保存为 'main.py'")
+        return
+    
+    print("开始打包 OnlineReading 浏览器应用...")
+    print("这可能需要几分钟时间，请耐心等待...")
+    
+    try:
+        # 运行 PyInstaller
+        PyInstaller.__main__.run(options)
+        
+        print("\n打包成功完成！")
+        print(f"可执行文件位于: {os.path.abspath(build_dir)}")
+        print("注意: 首次运行时可能需要几秒钟初始化")
+        
+    except Exception as e:
+        print(f"\n打包过程中出错: {str(e)}")
+        print("可能的解决方案:")
+        print("1. 确保安装了所有依赖: pip install PyQt5 PyQtWebEngine pyinstaller")
+        print("2. 确保您有足够的磁盘空间")
+        print("3. 尝试关闭防病毒软件")
+        print("4. 查看 PyInstaller 文档: https://pyinstaller.org/en/stable/")
 
-for resource in webengine_resources:
-    src = os.path.join(qt_path, "resources", resource)
-    if os.path.exists(src):
-        params.append(f"--add-data={src};PyQt5/Qt/resources")
-
-# 添加平台插件
-params.append(
-    "--add-data="
-    + os.path.join(qt_path, "plugins", "platforms")
-    + ";PyQt5/Qt/plugins/platforms"
-)
-
-# 执行打包
-PyInstaller.__main__.run(params)
-
-print("打包完成！EXE文件位于 dist 目录中")
+if __name__ == '__main__':
+    main()
