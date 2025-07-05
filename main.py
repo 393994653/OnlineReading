@@ -801,10 +801,21 @@ class MinimalBrowser(QWidget):
         QTimer.singleShot(500, final_close)
         event.ignore()
 
+def get_log_dir():
+    if getattr(sys, "frozen", False):
+        log_dir = os.path.join(
+            os.getenv("APPDATA") or os.path.expanduser("~"), "OnlineReading"
+        )
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir)
+        log_path = os.path.join(log_dir, "browser_error.log")
+    else:
+        log_path = "browser_error.log"
+    return log_path
 
 # 设置日志记录
 logging.basicConfig(
-    filename="browser_error.log",
+    filename=get_log_dir(),
     level=logging.ERROR,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
