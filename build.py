@@ -8,6 +8,7 @@ main_script = 'main.py'
 
 # 图标文件（确保此文件存在）
 icon_file = 'icon.ico'
+window_icon = 'icon.png'
 
 # 打包输出目录
 build_dir = 'dist'
@@ -27,6 +28,8 @@ options = [
     '--onefile',                # 打包为单个可执行文件
     '--windowed',               # 窗口应用（无控制台）
     
+    '--add-data', f'{window_icon}{os.pathsep}resources',
+
     # 包含 Qt WebEngine 核心文件
     '--collect-data', 'PyQt5.QtWebEngineCore',
     
@@ -59,6 +62,9 @@ def main():
         print("请创建一个 128x128 像素的 .ico 文件并命名为 'icon.ico'")
         print("您可以使用在线工具将 PNG 转换为 ICO 格式")
         return
+
+    if not os.path.exists(window_icon):
+        print(f"错误: 图标文件 '{window_icon}' 不存在")
     
     # 检查主脚本文件是否存在
     if not os.path.exists(main_script):

@@ -2,7 +2,7 @@
 from PyInstaller.utils.hooks import collect_data_files
 from PyInstaller.utils.hooks import collect_dynamic_libs
 
-datas = []
+datas = [('icon.png', 'resources')]
 binaries = []
 datas += collect_data_files('PyQt5.QtWebEngineCore')
 datas += collect_data_files('PyQt5.QtWebEngineWidgets')

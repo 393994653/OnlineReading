@@ -287,6 +287,7 @@ class MinimalBrowser(QWidget):
         self.target_url = target_url
         self.is_fullscreen = False  # 跟踪全屏状态
 
+
         # 添加标题栏显示延迟计时器
         self.title_bar_timer = QTimer(self)
         self.title_bar_timer.setSingleShot(True)  # 只触发一次
@@ -299,6 +300,7 @@ class MinimalBrowser(QWidget):
         # 设置窗口无边框和透明背景
         self.setWindowFlags(Qt.FramelessWindowHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setWindowIcon(self.get_icon("icon.png"))
 
         # 设置窗口大小
         self.resize(1200, 800)
@@ -387,6 +389,31 @@ class MinimalBrowser(QWidget):
         self.size_grip = QSizeGrip(self)
         self.size_grip.setStyleSheet("background-color: transparent;")  # 透明背景
         self.size_grip.raise_()  # 确保在最上层
+
+    def get_icon(self, filename):
+        """获取图标，支持开发环境和打包后环境"""
+        # 尝试从当前目录加载
+        base_path = os.path.dirname(os.path.abspath(__file__))
+        local_path = os.path.join(base_path, filename)
+        
+        # 如果文件存在，直接使用
+        if os.path.exists(local_path):
+            return QIcon(local_path)
+        
+        # 如果是在打包后的环境中运行
+        if hasattr(sys, '_MEIPASS'):
+            # 尝试从 MEIPASS 目录加载
+            meipass_path = os.path.join(sys._MEIPASS, filename)
+            if os.path.exists(meipass_path):
+                return QIcon(meipass_path)
+            
+            # 尝试从 MEIPASS 下的资源目录加载
+            resource_path = os.path.join(sys._MEIPASS, "resources", filename)
+            if os.path.exists(resource_path):
+                return QIcon(resource_path)
+        
+        # 如果都没有找到，返回空图标（避免崩溃）
+        return QIcon()
 
     def configure_browser(self):
         """配置浏览器设置"""
